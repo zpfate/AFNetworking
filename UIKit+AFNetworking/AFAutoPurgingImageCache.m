@@ -31,6 +31,7 @@
 @property (nonatomic, copy) NSString *identifier;
 @property (nonatomic, assign) UInt64 totalBytes;
 @property (nonatomic, strong) NSDate *lastAccessDate;
+// 使用的内存
 @property (nonatomic, assign) UInt64 currentMemoryUsage;
 
 @end
@@ -43,6 +44,7 @@
         self.identifier = identifier;
 
         CGSize imageSize = CGSizeMake(image.size.width * image.scale, image.size.height * image.scale);
+        // 一个物理点4个像素
         CGFloat bytesPerPixel = 4.0;
         CGFloat bytesPerSize = imageSize.width * imageSize.height;
         self.totalBytes = (UInt64)bytesPerPixel * (UInt64)bytesPerSize;
@@ -52,6 +54,7 @@
 }
 
 - (UIImage *)accessImage {
+    // 获取之后更新时间
     self.lastAccessDate = [NSDate date];
     return self.image;
 }
@@ -73,6 +76,8 @@
 @implementation AFAutoPurgingImageCache
 
 - (instancetype)init {
+    // 总大小为100M
+    // 清理偏好阈值为60M
     return [self initWithMemoryCapacity:100 * 1024 * 1024 preferredMemoryCapacity:60 * 1024 * 1024];
 }
 
@@ -83,6 +88,9 @@
         self.cachedImages = [[NSMutableDictionary alloc] init];
 
         NSString *queueName = [NSString stringWithFormat:@"com.alamofire.autopurgingimagecache-%@", [[NSUUID UUID] UUIDString]];
+        
+        // 栅栏标记 - sync
+        
         self.synchronizationQueue = dispatch_queue_create([queueName cStringUsingEncoding:NSASCIIStringEncoding], DISPATCH_QUEUE_CONCURRENT);
 
         [[NSNotificationCenter defaultCenter]
@@ -107,12 +115,18 @@
     return result;
 }
 
+// 下载器-> 对象 ->响应 ->接口
+// 接口实现 -- identifier - url - 加密
 - (void)addImage:(UIImage *)image withIdentifier:(NSString *)identifier {
+    
+    // 栅栏 -- 同步 -- 一个一个的出来
+    // 同一张url -- url - id, url相同不代表图片相同, 所以需要重新更新大小
     dispatch_barrier_async(self.synchronizationQueue, ^{
         AFCachedImage *cacheImage = [[AFCachedImage alloc] initWithImage:image identifier:identifier];
 
         AFCachedImage *previousCachedImage = self.cachedImages[identifier];
         if (previousCachedImage != nil) {
+
             self.currentMemoryUsage -= previousCachedImage.totalBytes;
         }
 
@@ -121,22 +135,32 @@
     });
 
     dispatch_barrier_async(self.synchronizationQueue, ^{
+        
+        // 触发清理缓存的时机
         if (self.currentMemoryUsage > self.memoryCapacity) {
+            
+            // 需要清理的缓存大小
             UInt64 bytesToPurge = self.currentMemoryUsage - self.preferredMemoryUsageAfterPurge;
+            
+            // 根据使用时间排序
             NSMutableArray <AFCachedImage*> *sortedImages = [NSMutableArray arrayWithArray:self.cachedImages.allValues];
             NSSortDescriptor *sortDescriptor = [[NSSortDescriptor alloc] initWithKey:@"lastAccessDate"
                                                                            ascending:YES];
             [sortedImages sortUsingDescriptors:@[sortDescriptor]];
 
+            // 需要清除的缓存
             UInt64 bytesPurged = 0;
 
             for (AFCachedImage *cachedImage in sortedImages) {
+                
+                // 清除缓存
                 [self.cachedImages removeObjectForKey:cachedImage.identifier];
                 bytesPurged += cachedImage.totalBytes;
                 if (bytesPurged >= bytesToPurge) {
                     break;
                 }
             }
+            // 清除完成后 更新当前使用缓存
             self.currentMemoryUsage -= bytesPurged;
         }
     });
@@ -168,6 +192,7 @@
 }
 
 - (nullable UIImage *)imageWithIdentifier:(NSString *)identifier {
+    
     __block UIImage *image = nil;
     dispatch_sync(self.synchronizationQueue, ^{
         AFCachedImage *cachedImage = self.cachedImages[identifier];

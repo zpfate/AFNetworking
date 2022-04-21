@@ -121,16 +121,19 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  The total memory capacity of the cache in bytes.
+ 使用内存的阈值
  */
 @property (nonatomic, assign) UInt64 memoryCapacity;
 
 /**
  The preferred memory usage after purge in bytes. During a purge, images will be purged until the memory capacity drops below this limit.
+ 使用内存超过阈值后,清理内存的大小
  */
 @property (nonatomic, assign) UInt64 preferredMemoryUsageAfterPurge;
 
 /**
  The current total memory usage in bytes of all images stored within the cache.
+ 当前使用的内存大小
  */
 @property (nonatomic, assign, readonly) UInt64 memoryUsage;
 
