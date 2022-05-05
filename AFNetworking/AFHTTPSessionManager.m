@@ -78,7 +78,9 @@
 
     self.baseURL = url;
 
+    // 请求序列化
     self.requestSerializer = [AFHTTPRequestSerializer serializer];
+    // 返回结果序列化
     self.responseSerializer = [AFJSONResponseSerializer serializer];
 
     return self;
@@ -100,7 +102,9 @@
 
 @dynamic securityPolicy;
 
+// 安全策略
 - (void)setSecurityPolicy:(AFSecurityPolicy *)securityPolicy {
+    
     if (securityPolicy.SSLPinningMode != AFSSLPinningModeNone && ![self.baseURL.scheme isEqualToString:@"https"]) {
         NSString *pinningMode = @"Unknown Pinning Mode";
         switch (securityPolicy.SSLPinningMode) {
@@ -348,10 +352,10 @@
     
     NSError *serializationError = nil;
     
-    /// 生成request
+    /// 序列化并生成request
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:method URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:&serializationError];
     
-    /// keyEnumerator遍历字典key
+    /// keyEnumerator遍历字典请求头key
     for (NSString *headerField in headers.keyEnumerator) {
         [request addValue:headers[headerField] forHTTPHeaderField:headerField];
     }
@@ -365,6 +369,7 @@
         return nil;
     }
 
+    // 创建请求
     __block NSURLSessionDataTask *dataTask = nil;
     dataTask = [self dataTaskWithRequest:request
                           uploadProgress:uploadProgress
