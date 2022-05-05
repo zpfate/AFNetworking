@@ -70,8 +70,12 @@
     if (!self) {
         return nil;
     }
-
+    
     // Ensure terminal slash for baseURL path, so that NSURL +URLWithString:relativeToURL: works as expected
+    // url有值且没有‘/’,那么在url的末尾添加‘/’
+    // 解释1: 防止重定向 -- www.baidu.com 调用2次 浪费带宽
+    // 解释2: 表示目录 信息的拼接 路由
+    // 解释3: SEO 搜索引擎优化
     if ([[url path] length] > 0 && ![[url absoluteString] hasSuffix:@"/"]) {
         url = [url URLByAppendingPathComponent:@""];
     }

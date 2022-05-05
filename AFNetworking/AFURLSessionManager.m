@@ -116,13 +116,18 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
 
 
 #pragma mark -
-
+// 处理上传或下载的进度
+// 处理获取完数据后的行为
 @interface AFURLSessionManagerTaskDelegate : NSObject <NSURLSessionTaskDelegate, NSURLSessionDataDelegate, NSURLSessionDownloadDelegate>
 - (instancetype)initWithTask:(NSURLSessionTask *)task;
 @property (nonatomic, weak) AFURLSessionManager *manager;
+// 接收的数据
 @property (nonatomic, strong) NSMutableData *mutableData;
+// 上传进度
 @property (nonatomic, strong) NSProgress *uploadProgress;
+// 下载进度
 @property (nonatomic, strong) NSProgress *downloadProgress;
+// 下载路径
 @property (nonatomic, copy) NSURL *downloadFileURL;
 #if AF_CAN_INCLUDE_SESSION_TASK_METRICS
 @property (nonatomic, strong) NSURLSessionTaskMetrics *sessionTaskMetrics;
@@ -513,24 +518,38 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
         configuration = [NSURLSessionConfiguration defaultSessionConfiguration];
     }
 
+    // 设置默认的configuration
     self.sessionConfiguration = configuration;
 
+    // 设置操作队列并发数量为1 串行队列
     self.operationQueue = [[NSOperationQueue alloc] init];
     self.operationQueue.maxConcurrentOperationCount = 1;
 
+    // 默认为json序列化
     self.responseSerializer = [AFJSONResponseSerializer serializer];
 
+    // 设置默认证书 无条件信任https认证
     self.securityPolicy = [AFSecurityPolicy defaultPolicy];
 
 #if !TARGET_OS_WATCH
+    // 网络状态监听
     self.reachabilityManager = [AFNetworkReachabilityManager sharedManager];
 #endif
 
+    /*
+     * value: delegate
+     * key: taskid
+     */
     self.mutableTaskDelegatesKeyedByTaskIdentifier = [[NSMutableDictionary alloc] init];
 
+    // 初始化锁
     self.lock = [[NSLock alloc] init];
     self.lock.name = AFURLSessionManagerLockName;
 
+    
+    // 获取session中的task
+    // 异步的获取当前session的所有未完成的task
+    // 其实讲道理来说在初始化中调用这个方法应该里面一个task都不会有 防止后台任务回来, 重新初始化session，一些之前的后台请求任务会导致程序crash
     __weak typeof(self) weakSelf = self;
     [self.session getTasksWithCompletionHandler:^(NSArray *dataTasks, NSArray *uploadTasks, NSArray *downloadTasks) {
         
@@ -552,6 +571,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
 }
 
 - (void)dealloc {
+    // 移除观察者
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
